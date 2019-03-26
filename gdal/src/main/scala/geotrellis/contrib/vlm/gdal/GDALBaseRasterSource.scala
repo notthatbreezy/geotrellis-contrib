@@ -63,33 +63,33 @@ trait GDALBaseRasterSource extends RasterSource {
   lazy val gridExtent: GridExtent[Long] = dataset.rasterExtent.toGridType[Long]
 
   /** Resolutions of available overviews in GDAL Dataset
-    *
-    * These resolutions could represent actual overview as seen in source file
-    * or overviews of VRT that was created as result of resample operations.
-    */
-  lazy val resolutions: List[RasterExtent] = {
-    val band = dataset.GetRasterBand(1)
-    gridExtent :: (0 until band.GetOverviewCount).toList.map { idx =>
-      val ovr = band.GetOverview(idx)
-      RasterExtent(extent, cols = ovr.getXSize, rows = ovr.getYSize)
+      *
+      * These resolutions could represent actual overview as seen in source file
+      * or overviews of VRT that was created as result of resample operations.
+      */
+    lazy val resolutions: List[GridExtent[Long]] = {
+      val band = dataset.GetRasterBand(1)
+      gridExtent :: (0 until band.GetOverviewCount).toList.map { idx =>
+        val ovr = band.GetOverview(idx)
+        GridExtent(extent, ovr.getXSize.toLong, ovr.getYSize.toLong)
+      }
     }
-  }
 
   override def readBounds(bounds: Traversable[GridBounds[Long]], bands: Seq[Int]): Iterator[Raster[MultibandTile]] = {
     bounds
       .toIterator
       .flatMap { gb => gridBounds.intersection(gb) }
       .map { gb =>
-        val tile = reader.read(gb, bands = bands)
+        val tile = reader.read(gb.toGridType[Int], bands = bands)
         val extent = gridExtent.extentFor(gb)
         convertRaster(Raster(tile, extent))
       }
   }
 
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): RasterSource =
-    GDALReprojectRasterSource(uri, reprojectOptions, strategy, options.reproject(gridExtent, crs, targetCRS, reprojectOptions))
+    GDALReprojectRasterSource(uri, reprojectOptions, strategy, options.reproject(gridExtent.toRasterExtent, crs, targetCRS, reprojectOptions))
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource = {
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy): RasterSource = {
     GDALResampleRasterSource(uri, resampleGrid, method, strategy, options.resample(gridExtent, resampleGrid))
   }
 

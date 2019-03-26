@@ -26,7 +26,7 @@ import cats.syntax.option._
 
 case class GDALResampleRasterSource(
   uri: String,
-  resampleGrid: ResampleGrid,
+  resampleGrid: ResampleGrid[Long],
   method: ResampleMethod = NearestNeighbor,
   strategy: OverviewStrategy = AutoHigherResolution,
   options: GDALWarpOptions = GDALWarpOptions(),
@@ -38,15 +38,15 @@ case class GDALResampleRasterSource(
     val res = resampleGrid match {
       case Dimensions(cols, rows) =>
         GDALWarpOptions(
-          dimensions = (cols, rows).some,
+          dimensions = (cols.toInt, rows.toInt).some,
           resampleMethod = resampleMethod
         )
       case _ =>
         lazy val rasterExtent: RasterExtent = baseDataset.rasterExtent
         // raster extent won't be calculated if it's not called in the apply function body explicitly
         val targetRasterExtent = {
-          val re = resampleGrid(rasterExtent)
-          if(options.alignTargetPixels) re.alignTargetPixels else re
+          val re = resampleGrid(rasterExtent.toGridType[Long])
+          if(options.alignTargetPixels) re.toRasterExtent.alignTargetPixels else re
         }
         GDALWarpOptions(
           te             = targetRasterExtent.extent.some,

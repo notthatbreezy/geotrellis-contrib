@@ -29,6 +29,7 @@ import geotrellis.raster.io.geotiff.{AutoHigherResolution, OverviewStrategy}
 import geotrellis.raster.render._
 import geotrellis.spark.tiling.LayoutDefinition
 import geotrellis.util.GetComponent
+import spire.math.Integral
 
 /**
   * Single threaded instance of a reader for reading windows out of collections
@@ -44,7 +45,7 @@ trait MosaicRasterSource extends RasterSource {
 
   val sources: NonEmptyList[RasterSource]
   val crs: CRS
-  def gridExtent(): GridExtent[Long]
+  def gridExtent: GridExtent[Long]
 
   import MosaicRasterSource._
 
@@ -81,8 +82,7 @@ trait MosaicRasterSource extends RasterSource {
     *
     * @see [[geotrellis.contrib.vlm.RasterSource.resolutions]]
     */
-  def resolutions = {
-    val resolutions = sources map { _.resolutions }
+  def resolutions: List[GridExtent[Long]] = { val resolutions = sources map { _.resolutions }
     resolutions.reduce
   }
 
@@ -108,7 +108,7 @@ trait MosaicRasterSource extends RasterSource {
     rasters.reduce
   }
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy)
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy)
       : RasterSource = MosaicRasterSource(
     sources map { _.resample(resampleGrid, method, strategy) },
     crs
@@ -136,11 +136,26 @@ object MosaicRasterSource {
       }
     }
 
-  def apply(_sources: NonEmptyList[RasterSource], _crs: CRS, _rasterExtent: RasterExtent) =
+  implicit def gridExtentSemigroup[N: Integral]: Semigroup[GridExtent[N]] =
+    new Semigroup[GridExtent[N]] {
+      def combine(l: GridExtent[N], r: GridExtent[N]): GridExtent[N] = {
+        if (l.cellwidth != r.cellwidth)
+          throw GeoAttrsError(s"illegal cellwidths: ${l.cellwidth} and ${r.cellwidth}")
+        if (l.cellheight != r.cellheight)
+          throw GeoAttrsError(s"illegal cellheights: ${l.cellheight} and ${r.cellheight}")
+
+        val newExtent = l.extent.combine(r.extent)
+        val newRows = Integral[N].fromDouble(math.ceil(newExtent.height / l.cellheight))
+        val newCols = Integral[N].fromDouble(math.ceil(newExtent.width / l.cellwidth))
+        new GridExtent[N](newExtent, l.cellwidth, l.cellheight, newCols, newRows)
+      }
+    }
+
+  def apply(_sources: NonEmptyList[RasterSource], _crs: CRS, _gridExtent: GridExtent[Long]) =
     new MosaicRasterSource {
       val sources = _sources map { _.reprojectToGrid(_crs, gridExtent) }
       val crs = _crs
-      def gridExtent(): GridExtent[Long] = _rasterExtent
+      def gridExtent: GridExtent[Long] = _gridExtent
     }
 
   def apply(_sources: NonEmptyList[RasterSource], _crs: CRS) =
@@ -154,8 +169,8 @@ object MosaicRasterSource {
       } minBy { _.resolution }
       val sources = _sources map { _.reprojectToGrid(_crs, _sources.head.gridExtent) }
       val crs = _crs
-      def gridExtent(): GridExtent[Long] = reprojectedExtents.toList.reduce(
-        (re1: RasterExtent, re2: RasterExtent) => {
+      def gridExtent: GridExtent[Long] = reprojectedExtents.toList.reduce(
+        (re1: GridExtent[Long], re2: GridExtent[Long]) => {
           re1.withResolution(minCellSize) combine re2.withResolution(minCellSize)
         }
       )
@@ -164,10 +179,10 @@ object MosaicRasterSource {
   @SuppressWarnings(Array("TraversableHead", "TraversableTail"))
   def unsafeFromList(_sources: List[RasterSource],
                      _crs: CRS = WebMercator,
-                     _rasterExtent: Option[RasterExtent]) =
+                     _gridExtent: Option[GridExtent[Long]]) =
     new MosaicRasterSource {
       val sources = NonEmptyList(_sources.head, _sources.tail)
       val crs = _crs
-      def gridExtent: GridExtent[Long] = _rasterExtent getOrElse { _sources.head.gridExtent}
+      def gridExtent: GridExtent[Long] = _gridExtent getOrElse { _sources.head.gridExtent}
     }
 }

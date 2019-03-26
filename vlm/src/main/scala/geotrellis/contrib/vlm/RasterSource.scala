@@ -41,11 +41,10 @@ import geotrellis.util.GetComponent
   * @groupdesc reproject Functions to resample raster data in target projection.
   * @groupprio reproject 2
   */
-trait RasterSource extends Grid[Long] with AutoCloseable with Serializable {
+trait RasterSource extends CellGrid[Long] with AutoCloseable with Serializable {
   def uri: String
   def crs: CRS
   def bandCount: Int
-
   def cellType: CellType
 
   /** Cell size at which rasters will be read when using this [[RasterSource]]
@@ -68,7 +67,7 @@ trait RasterSource extends Grid[Long] with AutoCloseable with Serializable {
     *
     * __Note__: It is expected but not guaranteed that the extent each [[RasterExtent]] in this list will be the same.
     */
-  def resolutions: List[RasterExtent]
+  def resolutions: List[GridExtent[Long]]
 
   def extent: Extent = gridExtent.extent
 
@@ -111,12 +110,12 @@ trait RasterSource extends Grid[Long] with AutoCloseable with Serializable {
     reproject(crs, Reproject.Options(method = method, targetRasterExtent = Some(region)), strategy)
 
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy): RasterSource
 
   /** Sampling grid is defined of the footprint of the data with resolution implied by column and row count.
     * @group resample
     */
-  def resample(targetCols: Int, targetRows: Int, method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
+  def resample(targetCols: Long, targetRows: Long, method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
     resample(Dimensions(targetCols, targetRows), method, strategy)
 
   /** Sampling grid and resolution is defined by given [[GridExtent]].
@@ -125,15 +124,15 @@ trait RasterSource extends Grid[Long] with AutoCloseable with Serializable {
     * @group resample
     */
   def resampleToGrid(grid: GridExtent[Long], method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
-    resample(TargetGrid(grid), method, strategy)
+    resample(TargetGrid[Long](grid), method, strategy)
 
   /** Sampling grid and resolution is defined by given [[RasterExtent]] region.
     * The extent of the result is also taken from given [[RasterExtent]],
     *   this region may be larger or smaller than the footprint of the data
     * @group resample
     */
-  def resampleToRegion(region: RasterExtent, method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
-    resample(TargetRegion(region), method, strategy)
+  def resampleToRegion(region: GridExtent[Long], method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
+    resample(TargetRegion[Long](region), method, strategy)
 
   /** Reads a window for the extent.
     * Return extent may be smaller than requested extent around raster edges.

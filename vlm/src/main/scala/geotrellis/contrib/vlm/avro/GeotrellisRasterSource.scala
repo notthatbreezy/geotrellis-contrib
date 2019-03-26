@@ -46,7 +46,7 @@ case class GeotrellisRasterSource(
   lazy val metadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](layerId)
   lazy val gridExtent: GridExtent[Long] = metadata.layout.createAlignedGridExtent(metadata.extent)
 
-  lazy val resolutions: List[RasterExtent] = GeotrellisRasterSource.getResolutions(reader, layerId.name)
+  lazy val resolutions: List[GridExtent[Long]] = GeotrellisRasterSource.getResolutions(reader, layerId.name)
 
   def crs: CRS = metadata.crs
   def cellType: CellType = dstCellType.getOrElse(metadata.cellType)
@@ -71,7 +71,7 @@ case class GeotrellisRasterSource(
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): GeotrellisReprojectRasterSource =
     GeotrellisReprojectRasterSource(uri, layerId, bandCount, targetCRS, reprojectOptions, strategy, targetCellType)
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource =
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy): RasterSource =
     GeotrellisResampleRasterSource(uri, layerId, bandCount, resampleGrid, method, strategy, targetCellType)
 
   def convert(targetCellType: TargetCellType): RasterSource =
@@ -84,35 +84,47 @@ object GeotrellisRasterSource {
   def getLayerIdsByName(reader: CollectionLayerReader[LayerId], layerName: String): Seq[LayerId] =
     reader.attributeStore.layerIds.filter(_.name == layerName)
 
-  def getResolutions(reader: CollectionLayerReader[LayerId], layerName: String): List[RasterExtent] =
+  def getResolutions(reader: CollectionLayerReader[LayerId], layerName: String): List[GridExtent[Long]] =
     getLayerIdsByName(reader, layerName)
       .map { currLayerId =>
         val layerMetadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](currLayerId)
-        layerMetadata.layout.createAlignedGridExtent(layerMetadata.extent).toRasterExtent()
+        layerMetadata.layout.createAlignedGridExtent(layerMetadata.extent)
       }.toList
 
-  def getClosestResolution(resolutions: List[RasterExtent], cellSize: CellSize, strategy: OverviewStrategy = AutoHigherResolution): Option[RasterExtent] = {
+  def getClosestResolution(
+    resolutions: List[GridExtent[Long]],
+    cellSize: CellSize,
+    strategy: OverviewStrategy = AutoHigherResolution
+  ): Option[GridExtent[Long]] = {
     strategy match {
       case AutoHigherResolution =>
         resolutions
           .map { v => (cellSize.resolution - v.cellSize.resolution) -> v }
           .filter(_._1 >= 0)
           .sortBy(_._1)
-          .map(_._2)
+          .map(_._2.toGridType[Long])
           .headOption
+
       case Auto(n) =>
         resolutions
           .sortBy(v => math.abs(cellSize.resolution - v.cellSize.resolution))
           .lift(n) // n can be out of bounds,
+          .map(_.toGridType[Long])
       // makes only overview lookup as overview position is important
       case Base => None
     }
   }
 
-  def getClosestLayer(resolutions: List[RasterExtent], layerIds: Seq[LayerId], baseLayerId: LayerId, cellSize: CellSize, strategy: OverviewStrategy = AutoHigherResolution): LayerId = {
+  def getClosestLayer(
+    resolutions: List[GridExtent[Long]],
+    layerIds: Seq[LayerId],
+    baseLayerId: LayerId,
+    cellSize: CellSize,
+    strategy: OverviewStrategy = AutoHigherResolution
+  ): LayerId = {
     getClosestResolution(resolutions, cellSize, strategy) match {
       case Some(resolution) => {
-        val resolutionLayerIds: Map[RasterExtent, LayerId] = (resolutions zip layerIds).toMap
+        val resolutionLayerIds: Map[GridExtent[Long], LayerId] = (resolutions zip layerIds).toMap
         resolutionLayerIds.get(resolution) match {
           case Some(closestLayerId) => closestLayerId
           case None => baseLayerId

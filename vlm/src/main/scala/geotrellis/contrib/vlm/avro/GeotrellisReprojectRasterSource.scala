@@ -45,8 +45,8 @@ case class GeotrellisReprojectRasterSource(
 
   protected lazy val baseCRS: CRS = baseMetadata.crs
   protected lazy val baseMetadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](baseLayerId)
-  protected lazy val baseRasterExtent: RasterExtent =
-    baseMetadata.layout.createAlignedGridExtent(baseMetadata.extent).toRasterExtent()
+  protected lazy val baseGridExtent: GridExtent[Long] =
+    baseMetadata.layout.createAlignedGridExtent(baseMetadata.extent)
 
   protected lazy val transform = Transform(baseCRS, crs)
   protected lazy val backTransform = Transform(crs, baseCRS)
@@ -56,14 +56,14 @@ case class GeotrellisReprojectRasterSource(
 
   override lazy val gridExtent: GridExtent[Long] = reprojectOptions.targetRasterExtent match {
       case Some(targetRasterExtent) =>
-        targetRasterExtent
+        targetRasterExtent.toGridType[Long]
       case None =>
-        ReprojectRasterExtent(baseRasterExtent, transform, reprojectOptions)
+        ReprojectRasterExtent(baseGridExtent, transform, reprojectOptions)
     }
 
-  lazy val resolutions: List[RasterExtent] =
-    GeotrellisRasterSource.getResolutions(reader, layerName).map(resolution =>
-      ReprojectRasterExtent(resolution, transform))
+  lazy val resolutions: List[GridExtent[Long]] =
+      GeotrellisRasterSource.getResolutions(reader, layerName).map(resolution =>
+        ReprojectRasterExtent(resolution, transform))
 
   @transient private[vlm] lazy val layerId: LayerId = {
     if (reprojectOptions.targetRasterExtent.isDefined
@@ -74,7 +74,7 @@ case class GeotrellisReprojectRasterSource(
       val estimatedSource = ReprojectRasterExtent(gridExtent, backTransform, reprojectOptions)
       GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, estimatedSource.cellSize, strategy)
     } else {
-      GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, baseRasterExtent.cellSize, strategy)
+      GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, baseGridExtent.cellSize, strategy)
     }
   }
 
@@ -104,8 +104,8 @@ case class GeotrellisReprojectRasterSource(
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): RasterSource =
     GeotrellisReprojectRasterSource(uri, baseLayerId, bandCount, targetCRS, reprojectOptions, strategy, targetCellType)
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource = {
-    val resampledReprojectOptions = reprojectOptions.copy(method = method, targetRasterExtent = Some(resampleGrid(self.gridExtent)))
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy): RasterSource = {
+    val resampledReprojectOptions = reprojectOptions.copy(method = method, targetRasterExtent = Some(resampleGrid(self.gridExtent).toRasterExtent))
     GeotrellisReprojectRasterSource(uri, baseLayerId, bandCount, crs, resampledReprojectOptions, strategy, targetCellType)
   }
 

@@ -79,7 +79,19 @@ package object vlm {
 
     def reproject(src: CRS, dest: CRS): RasterExtent =
       reproject(src, dest, Options.DEFAULT)
+  }
 
-    def toGridExtent: GridExtent = GridExtent(self.extent, self.cellheight, self.cellwidth)
+  implicit class gridExtentMethods[N: spire.math.Integral](self: GridExtent[N]) {
+    def reproject(src: CRS, dest: CRS, options: Options): GridExtent[N] =
+      if(src == dest) self
+      else {
+        val transform = Transform(src, dest)
+        options.targetRasterExtent.
+          map(_.toGridType[N]).
+          getOrElse(ReprojectRasterExtent(self, transform, options = options))
+      }
+
+    def reproject(src: CRS, dest: CRS): GridExtent[N] =
+      reproject(src, dest, Options.DEFAULT)
   }
 }

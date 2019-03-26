@@ -30,7 +30,7 @@ case class GeotrellisResampleRasterSource(
   uri: String,
   baseLayerId: LayerId,
   bandCount: Int,
-  resampleGrid: ResampleGrid,
+  resampleGrid: ResampleGrid[Long],
   method: ResampleMethod = NearestNeighbor,
   strategy: OverviewStrategy = AutoHigherResolution,
   private[vlm] val targetCellType: Option[TargetCellType] = None
@@ -38,8 +38,7 @@ case class GeotrellisResampleRasterSource(
   lazy val reader = CollectionLayerReader(uri)
 
   lazy val baseMetadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](baseLayerId)
-  lazy val baseRasterExtent: RasterExtent =
-    baseMetadata.layout.createAlignedGridExtent(baseMetadata.extent).toRasterExtent()
+  lazy val baseGridExtent: GridExtent[Long] = baseMetadata.layout.createAlignedGridExtent(baseMetadata.extent)
 
   @transient protected lazy val layerId: LayerId =
     GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, gridExtent.cellSize, strategy)
@@ -51,8 +50,8 @@ case class GeotrellisResampleRasterSource(
   def resampleMethod: Option[ResampleMethod] = Some(method)
 
   lazy val layerName = baseLayerId.name
-  lazy val gridExtent: GridExtent[Long] = resampleGrid(baseRasterExtent)
-  lazy val resolutions: List[RasterExtent] = GeotrellisRasterSource.getResolutions(reader, layerName)
+  lazy val gridExtent: GridExtent[Long] = resampleGrid(baseGridExtent)
+  lazy val resolutions: List[GridExtent[Long]] = GeotrellisRasterSource.getResolutions(reader, layerName)
   lazy val layerIds: Seq[LayerId] = GeotrellisRasterSource.getLayerIdsByName(reader, layerName)
 
   def read(extent: Extent, bands: Seq[Int]): Option[Raster[MultibandTile]] =
@@ -72,7 +71,7 @@ case class GeotrellisResampleRasterSource(
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): GeotrellisReprojectRasterSource =
     GeotrellisReprojectRasterSource(uri, baseLayerId, bandCount, targetCRS, reprojectOptions, strategy, targetCellType)
 
-  def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource =
+  def resample(resampleGrid: ResampleGrid[Long], method: ResampleMethod, strategy: OverviewStrategy): RasterSource =
     GeotrellisResampleRasterSource(uri, baseLayerId, bandCount, resampleGrid, method, strategy, targetCellType)
 
   def convert(targetCellType: TargetCellType): RasterSource =
