@@ -44,7 +44,7 @@ trait MosaicRasterSource extends RasterSource {
 
   val sources: NonEmptyList[RasterSource]
   val crs: CRS
-  def rasterExtent: RasterExtent
+  def gridExtent(): GridExtent[Long]
 
   import MosaicRasterSource._
 
@@ -95,7 +95,7 @@ trait MosaicRasterSource extends RasterSource {
       : RasterSource = MosaicRasterSource(
     sources map { _.reproject(crs, reprojectOptions, strategy) },
     crs,
-    rasterExtent.reproject(this.crs, crs, reprojectOptions)
+    gridExtent.reproject(this.crs, crs, reprojectOptions)
   )
 
   def read(extent: Extent, bands: Seq[Int]): Option[Raster[MultibandTile]] = {
@@ -103,7 +103,7 @@ trait MosaicRasterSource extends RasterSource {
     rasters.reduce
   }
 
-  def read(bounds: GridBounds, bands: Seq[Int]): Option[Raster[MultibandTile]] = {
+  def read(bounds: GridBounds[Long], bands: Seq[Int]): Option[Raster[MultibandTile]] = {
     val rasters = sources map { _.read(bounds, bands) }
     rasters.reduce
   }
@@ -138,23 +138,23 @@ object MosaicRasterSource {
 
   def apply(_sources: NonEmptyList[RasterSource], _crs: CRS, _rasterExtent: RasterExtent) =
     new MosaicRasterSource {
-      val sources = _sources map { _.reprojectToGrid(_crs, rasterExtent) }
+      val sources = _sources map { _.reprojectToGrid(_crs, gridExtent) }
       val crs = _crs
-      def rasterExtent = _rasterExtent
+      def gridExtent(): GridExtent[Long] = _rasterExtent
     }
 
   def apply(_sources: NonEmptyList[RasterSource], _crs: CRS) =
     new MosaicRasterSource {
       val reprojectedExtents =
         _sources map { source =>
-          source.rasterExtent.reproject(source.crs, _crs)
+          source.gridExtent.reproject(source.crs, _crs)
         }
       val minCellSize: CellSize = reprojectedExtents.toList map { rasterExtent =>
         CellSize(rasterExtent.cellwidth, rasterExtent.cellheight)
       } minBy { _.resolution }
-      val sources = _sources map { _.reprojectToGrid(_crs, _sources.head.rasterExtent) }
+      val sources = _sources map { _.reprojectToGrid(_crs, _sources.head.gridExtent) }
       val crs = _crs
-      def rasterExtent = reprojectedExtents.toList.reduce(
+      def gridExtent(): GridExtent[Long] = reprojectedExtents.toList.reduce(
         (re1: RasterExtent, re2: RasterExtent) => {
           re1.withResolution(minCellSize) combine re2.withResolution(minCellSize)
         }
@@ -168,6 +168,6 @@ object MosaicRasterSource {
     new MosaicRasterSource {
       val sources = NonEmptyList(_sources.head, _sources.tail)
       val crs = _crs
-      def rasterExtent  = _rasterExtent getOrElse { _sources.head.rasterExtent }
+      def gridExtent: GridExtent[Long] = _rasterExtent getOrElse { _sources.head.gridExtent}
     }
 }

@@ -106,7 +106,7 @@ class GeotrellisRasterSourceSpec extends FunSpec with RasterMatchers with Better
 
       val actual: Raster[MultibandTile] =
         resampledSource
-          .resampleToGrid(expected.rasterExtent)
+                  .resampleToGrid(expected.rasterExtent)
           .read(expected.extent)
           .get
 

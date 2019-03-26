@@ -42,7 +42,7 @@ case class GeotrellisResampleRasterSource(
     baseMetadata.layout.createAlignedGridExtent(baseMetadata.extent).toRasterExtent()
 
   @transient protected lazy val layerId: LayerId =
-    GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, rasterExtent.cellSize, strategy)
+    GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, gridExtent.cellSize, strategy)
 
   lazy val metadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](layerId)
 
@@ -51,21 +51,21 @@ case class GeotrellisResampleRasterSource(
   def resampleMethod: Option[ResampleMethod] = Some(method)
 
   lazy val layerName = baseLayerId.name
-  lazy val rasterExtent: RasterExtent = resampleGrid(baseRasterExtent)
+  lazy val gridExtent: GridExtent[Long] = resampleGrid(baseRasterExtent)
   lazy val resolutions: List[RasterExtent] = GeotrellisRasterSource.getResolutions(reader, layerName)
   lazy val layerIds: Seq[LayerId] = GeotrellisRasterSource.getLayerIdsByName(reader, layerName)
 
   def read(extent: Extent, bands: Seq[Int]): Option[Raster[MultibandTile]] =
     GeotrellisRasterSource.readIntersecting(reader, layerId, metadata, extent, bands)
       .map { raster =>
-        val targetRasterExtent = rasterExtent.createAlignedRasterExtent(extent)
+        val targetRasterExtent = gridExtent.createAlignedRasterExtent(extent)
         raster.resample(targetRasterExtent, method)
       }
 
-  def read(bounds: GridBounds, bands: Seq[Int]): Option[Raster[MultibandTile]] = {
+  def read(bounds: GridBounds[Long], bands: Seq[Int]): Option[Raster[MultibandTile]] = {
     bounds
-      .intersection(this)
-      .map(rasterExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
+      .intersection(this.gridBounds)
+      .map(gridExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
       .flatMap(read(_, bands))
   }
 
@@ -81,6 +81,6 @@ case class GeotrellisResampleRasterSource(
   override def readExtents(extents: Traversable[Extent], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
     extents.toIterator.flatMap(read(_, bands))
 
-  override def readBounds(bounds: Traversable[GridBounds], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
-    bounds.toIterator.flatMap(_.intersection(this).flatMap(read(_, bands)))
+  override def readBounds(bounds: Traversable[GridBounds[Long]], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
+    bounds.toIterator.flatMap(_.intersection(this.gridBounds).flatMap(read(_, bands)))
 }

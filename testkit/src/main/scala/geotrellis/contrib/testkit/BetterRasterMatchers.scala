@@ -24,11 +24,11 @@ trait BetterRasterMatchers { self: Matchers with FunSpec with RasterMatchers =>
   private def dims[T <: Grid](t: T): String =
     s"""(${t.cols}, ${t.rows})"""
 
-  def dimensions[T<: CellGrid: ClassTag] (dims: (Int, Int)) = HavePropertyMatcher[T, (Int, Int)] { grid =>
+  def dimensions[T<: CellGrid[Int]: ClassTag] (dims: (Int, Int)) = HavePropertyMatcher[T, (Int, Int)] { grid =>
       HavePropertyMatchResult(grid.dimensions == dims, "dimensions", dims, grid.dimensions)
   }
 
-  def cellType[T<: CellGrid: ClassTag] (ct: CellType) = HavePropertyMatcher[T, CellType] { grid =>
+  def cellType[T<: CellGrid[Int]: ClassTag] (ct: CellType) = HavePropertyMatcher[T, CellType] { grid =>
       HavePropertyMatchResult(grid.cellType == ct, "cellType", ct, grid.cellType)
   }
 

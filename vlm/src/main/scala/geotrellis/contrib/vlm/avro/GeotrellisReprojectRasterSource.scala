@@ -54,12 +54,12 @@ case class GeotrellisReprojectRasterSource(
   protected lazy val layerName = baseLayerId.name
   protected lazy val layerIds: Seq[LayerId] = GeotrellisRasterSource.getLayerIdsByName(reader, layerName)
 
-  override lazy val rasterExtent: RasterExtent = reprojectOptions.targetRasterExtent match {
-    case Some(targetRasterExtent) =>
-      targetRasterExtent
-    case None =>
-      ReprojectRasterExtent(baseRasterExtent, transform, reprojectOptions)
-  }
+  override lazy val gridExtent: GridExtent[Long] = reprojectOptions.targetRasterExtent match {
+      case Some(targetRasterExtent) =>
+        targetRasterExtent
+      case None =>
+        ReprojectRasterExtent(baseRasterExtent, transform, reprojectOptions)
+    }
 
   lazy val resolutions: List[RasterExtent] =
     GeotrellisRasterSource.getResolutions(reader, layerName).map(resolution =>
@@ -71,7 +71,7 @@ case class GeotrellisReprojectRasterSource(
       || reprojectOptions.targetCellSize.isDefined)
     {
       // we're asked to match specific target resolution, estimate what resolution we need in source to sample it
-      val estimatedSource = ReprojectRasterExtent(rasterExtent, backTransform, reprojectOptions)
+      val estimatedSource = ReprojectRasterExtent(gridExtent, backTransform, reprojectOptions)
       GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, estimatedSource.cellSize, strategy)
     } else {
       GeotrellisRasterSource.getClosestLayer(resolutions, layerIds, baseLayerId, baseRasterExtent.cellSize, strategy)
@@ -81,7 +81,7 @@ case class GeotrellisReprojectRasterSource(
   def read(extent: Extent, bands: Seq[Int]): Option[Raster[MultibandTile]] = {
     for {
       _ <- this.extent.intersection(extent)
-      targetRasterExtent = rasterExtent.createAlignedRasterExtent(extent)
+      targetRasterExtent = gridExtent.createAlignedRasterExtent(extent)
       sourceExtent = targetRasterExtent.extent.reprojectAsPolygon(backTransform, 0.001).envelope
       raster <- GeotrellisRasterSource.readIntersecting(reader, layerId, metadata, sourceExtent, bands)
     } yield {
@@ -89,23 +89,23 @@ case class GeotrellisReprojectRasterSource(
     }
   }
 
-  def read(bounds: GridBounds, bands: Seq[Int]): Option[Raster[MultibandTile]] =
+  def read(bounds: GridBounds[Long], bands: Seq[Int]): Option[Raster[MultibandTile]] =
     bounds
-      .intersection(this)
-      .map(rasterExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
+      .intersection(this.gridBounds)
+      .map(gridExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
       .flatMap(read(_, bands))
 
   override def readExtents(extents: Traversable[Extent], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
     extents.toIterator.flatMap(read(_, bands))
 
-  override def readBounds(bounds: Traversable[GridBounds], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
-    bounds.toIterator.flatMap(_.intersection(this).flatMap(read(_, bands)))
+  override def readBounds(bounds: Traversable[GridBounds[Long]], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
+    bounds.toIterator.flatMap(_.intersection(this.gridBounds).flatMap(read(_, bands)))
 
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): RasterSource =
     GeotrellisReprojectRasterSource(uri, baseLayerId, bandCount, targetCRS, reprojectOptions, strategy, targetCellType)
 
   def resample(resampleGrid: ResampleGrid, method: ResampleMethod, strategy: OverviewStrategy): RasterSource = {
-    val resampledReprojectOptions = reprojectOptions.copy(method = method, targetRasterExtent = Some(resampleGrid(self.rasterExtent)))
+    val resampledReprojectOptions = reprojectOptions.copy(method = method, targetRasterExtent = Some(resampleGrid(self.gridExtent)))
     GeotrellisReprojectRasterSource(uri, baseLayerId, bandCount, crs, resampledReprojectOptions, strategy, targetCellType)
   }
 

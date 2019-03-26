@@ -44,8 +44,7 @@ case class GeotrellisRasterSource(
 
   lazy val reader = CollectionLayerReader(uri)
   lazy val metadata = reader.attributeStore.readMetadata[TileLayerMetadata[SpatialKey]](layerId)
-  lazy val rasterExtent: RasterExtent =
-    metadata.layout.createAlignedGridExtent(metadata.extent).toRasterExtent()
+  lazy val gridExtent: GridExtent[Long] = metadata.layout.createAlignedGridExtent(metadata.extent)
 
   lazy val resolutions: List[RasterExtent] = GeotrellisRasterSource.getResolutions(reader, layerId.name)
 
@@ -57,17 +56,17 @@ case class GeotrellisRasterSource(
     GeotrellisRasterSource.read(reader, layerId, metadata, extent, bands).map { convertRaster }
   }
 
-  def read(bounds: GridBounds, bands: Seq[Int]): Option[Raster[MultibandTile]] =
+  def read(bounds: GridBounds[Long], bands: Seq[Int]): Option[Raster[MultibandTile]] =
     bounds
-      .intersection(this)
-      .map(rasterExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
+      .intersection(this.gridBounds)
+      .map(gridExtent.extentFor(_).buffer(- cellSize.width / 2, - cellSize.height / 2))
       .flatMap(read(_, bands))
 
   override def readExtents(extents: Traversable[Extent], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
     extents.toIterator.flatMap(read(_, bands))
 
-  override def readBounds(bounds: Traversable[GridBounds], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
-    bounds.toIterator.flatMap(_.intersection(this).flatMap(read(_, bands)))
+  override def readBounds(bounds: Traversable[GridBounds[Long]], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
+    bounds.toIterator.flatMap(_.intersection(this.gridBounds).flatMap(read(_, bands)))
 
   def reproject(targetCRS: CRS, reprojectOptions: Reproject.Options, strategy: OverviewStrategy): GeotrellisReprojectRasterSource =
     GeotrellisReprojectRasterSource(uri, layerId, bandCount, targetCRS, reprojectOptions, strategy, targetCellType)

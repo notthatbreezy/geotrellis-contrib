@@ -41,7 +41,7 @@ import geotrellis.util.GetComponent
   * @groupdesc reproject Functions to resample raster data in target projection.
   * @groupprio reproject 2
   */
-trait RasterSource extends CellGrid with AutoCloseable with Serializable {
+trait RasterSource extends Grid[Long] with AutoCloseable with Serializable {
   def uri: String
   def crs: CRS
   def bandCount: Int
@@ -52,9 +52,9 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
     *
     * Note: some re-sampling of underlying raster data may be required to produce this cell size.
     */
-  def cellSize: CellSize = rasterExtent.cellSize
+  def cellSize: CellSize = gridExtent.cellSize
 
-  def rasterExtent: RasterExtent
+  def gridExtent: GridExtent[Long]
 
   /** All available resolutions for this raster source
     *
@@ -70,16 +70,13 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
     */
   def resolutions: List[RasterExtent]
 
-  def extent: Extent = rasterExtent.extent
+  def extent: Extent = gridExtent.extent
 
   /** Raster pixel column count */
-  def cols: Int = rasterExtent.cols
+  def cols: Long = gridExtent.cols
 
   /** Raster pixel row count */
-  def rows: Int = rasterExtent.rows
-
-  /** Raster pixel bounds */
-  def bounds: GridBounds = GridBounds(0, 0, cols - 1, rows - 1)
+  def rows: Long = gridExtent.rows
 
   /** Reproject to different CRS with explicit sampling reprojectOptions.
     * @see [[geotrellis.raster.reproject.Reproject]]
@@ -102,7 +99,7 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
     *   of the data footprint in the target grid.
     * @group reproject a
     */
-  def reprojectToGrid(crs: CRS, grid: GridExtent, method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
+  def reprojectToGrid(crs: CRS, grid: GridExtent[Long], method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
     reproject(crs, Reproject.Options(method = method, parentGridExtent = Some(grid)), strategy)
 
   /** Sampling grid and resolution is defined by given [[RasterExtent]] region.
@@ -127,7 +124,7 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
     *  of the data footprint in the target grid.
     * @group resample
     */
-  def resampleToGrid(grid: GridExtent, method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
+  def resampleToGrid(grid: GridExtent[Long], method: ResampleMethod = NearestNeighbor, strategy: OverviewStrategy = AutoHigherResolution): RasterSource =
     resample(TargetGrid(grid), method, strategy)
 
   /** Sampling grid and resolution is defined by given [[RasterExtent]] region.
@@ -152,7 +149,7 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
     * @group read
     */
   @throws[IndexOutOfBoundsException]("if requested bands do not exist")
-  def read(bounds: GridBounds, bands: Seq[Int]): Option[Raster[MultibandTile]]
+  def read(bounds: GridBounds[Long], bands: Seq[Int]): Option[Raster[MultibandTile]]
 
   /**
     * @group read
@@ -163,7 +160,7 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
   /**
     * @group read
     */
-  def read(bounds: GridBounds): Option[Raster[MultibandTile]] =
+  def read(bounds: GridBounds[Long]): Option[Raster[MultibandTile]] =
     read(bounds, (0 until bandCount))
 
   /**
@@ -192,13 +189,13 @@ trait RasterSource extends CellGrid with AutoCloseable with Serializable {
   /**
     * @group read
     */
-  def readBounds(bounds: Traversable[GridBounds], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
+  def readBounds(bounds: Traversable[GridBounds[Long]], bands: Seq[Int]): Iterator[Raster[MultibandTile]] =
     bounds.toIterator.flatMap(read(_, bands).toIterator)
 
   /**
     * @group read
     */
-  def readBounds(bounds: Traversable[GridBounds]): Iterator[Raster[MultibandTile]] =
+  def readBounds(bounds: Traversable[GridBounds[Long]]): Iterator[Raster[MultibandTile]] =
     bounds.toIterator.flatMap(read(_, (0 until bandCount)).toIterator)
 
   /**

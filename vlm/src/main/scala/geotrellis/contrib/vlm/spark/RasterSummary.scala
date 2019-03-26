@@ -95,7 +95,7 @@ case class RasterSummary(
 
 object RasterSummary {
   /** Collect [[RasterSummary]] from unstructred rasters, grouped by CRS */
-  def collect[V <: CellGrid: GetComponent[?, ProjectedExtent]](rdd: RDD[V]): Seq[RasterSummary] = {
+  def collect[V <: CellGrid[Int]: GetComponent[?, ProjectedExtent]](rdd: RDD[V]): Seq[RasterSummary] = {
     rdd
       .map { grid =>
         val ProjectedExtent(extent, crs) = grid.getComponent[ProjectedExtent]
@@ -110,13 +110,13 @@ object RasterSummary {
 
   // TODO: should be refactored, we need to reproject all metadata into a common CRS
   // this code is for the current code simplification
-  def fromRDD[V <: CellGrid: GetComponent[?, ProjectedExtent]](rdd: RDD[V]): RasterSummary = {
+  def fromRDD[V <: CellGrid[Int]: GetComponent[?, ProjectedExtent]](rdd: RDD[V]): RasterSummary = {
     val all = collect[V](rdd)
     require(all.size == 1, "multiple CRSs detected") // what to do in this case?
     all.head
   }
 
-  def fromSeq[V <: CellGrid: GetComponent[?, ProjectedExtent]](seq: Seq[V]): RasterSummary = {
+  def fromSeq[V <: CellGrid[Int]: GetComponent[?, ProjectedExtent]](seq: Seq[V]): RasterSummary = {
     val all =
       seq
         .map { grid =>
@@ -131,4 +131,3 @@ object RasterSummary {
     all.head
   }
 }
-
