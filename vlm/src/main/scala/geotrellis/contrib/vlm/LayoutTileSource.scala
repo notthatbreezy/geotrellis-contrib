@@ -41,7 +41,7 @@ class LayoutTileSource(val source: RasterSource, val layout: LayoutDefinition) e
      * We need to do this manually instead of using RasterExtent.gridBoundsFor because
      * the target pixel area isn't always square.
      */
-    val sourcePixelBounds = GridBounds(
+    val sourcePixelBounds = GridBounds[Long](
       colMin = (col * layout.tileCols - sourceColOffset),
       rowMin = (row * layout.tileRows - sourceRowOffset),
       colMax = ((col+1) * layout.tileCols - 1 - sourceColOffset),

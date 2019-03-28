@@ -93,7 +93,7 @@ lazy val vlm = project
       """
         |import geotrellis.contrib.vlm._
         |import geotrellis.contrib.vlm.geotiff._
-        |import geotrellis.contrib.vlm.gdal._
+        |import geotrellis.contrib.vlm.avro._
       """.stripMargin
   )
 

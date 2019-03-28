@@ -17,11 +17,12 @@ import spire.syntax.cfor._
 
 import scala.reflect._
 import java.nio.file.{Files, Paths}
+import spire.math.Integral
 
 trait BetterRasterMatchers { self: Matchers with FunSpec with RasterMatchers =>
   import BetterRasterMatchers._
 
-  private def dims[T <: Grid](t: T): String =
+  private def dims[T <: Grid[N], N: Integral](t: T): String =
     s"""(${t.cols}, ${t.rows})"""
 
   def dimensions[T<: CellGrid[Int]: ClassTag] (dims: (Int, Int)) = HavePropertyMatcher[T, (Int, Int)] { grid =>
