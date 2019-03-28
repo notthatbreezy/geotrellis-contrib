@@ -18,7 +18,7 @@ package geotrellis.contrib
 
 import geotrellis.util.{FileRangeReader, StreamingByteReader}
 import geotrellis.proj4.{CRS, Transform}
-import geotrellis.raster.{GridExtent, RasterExtent}
+import geotrellis.raster.{GridExtent, GridBounds, RasterExtent}
 import geotrellis.raster.reproject.Reproject.Options
 import geotrellis.raster.reproject.ReprojectRasterExtent
 import geotrellis.spark.io.http.util.HttpRangeReader
@@ -94,4 +94,10 @@ package object vlm {
     def reproject(src: CRS, dest: CRS): GridExtent[N] =
       reproject(src, dest, Options.DEFAULT)
   }
+
+  /** RasterSource interface reads GridBounds[Long] but GridBounds[Int] abounds.
+   * Implicit conversions are evil, but this one is always safe and saves typing.
+   */
+  implicit def gridBoundsIntToLong(bounds: GridBounds[Int]): GridBounds[Long] =
+    bounds.toGridType[Long]
 }
