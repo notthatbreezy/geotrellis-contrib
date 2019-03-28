@@ -94,10 +94,4 @@ package object vlm {
     def reproject(src: CRS, dest: CRS): GridExtent[N] =
       reproject(src, dest, Options.DEFAULT)
   }
-
-  /** RasterSource interface reads GridBounds[Long] but GridBounds[Int] abounds.
-   * Implicit conversions are evil, but this one is always safe and saves typing.
-   */
-  implicit def gridBoundsIntToLong(bounds: GridBounds[Int]): GridBounds[Long] =
-    bounds.toGridType[Long]
 }
