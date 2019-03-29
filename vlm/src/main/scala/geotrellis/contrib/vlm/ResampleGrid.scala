@@ -17,6 +17,7 @@
 package geotrellis.contrib.vlm
 
 import geotrellis.raster.{RasterExtent, GridExtent}
+import geotrellis.raster.reproject.Reproject
 import spire.math.Integral
 
 sealed trait ResampleGrid[N] {
@@ -37,4 +38,20 @@ case class TargetGrid[N: Integral](grid: GridExtent[Long]) extends ResampleGrid[
 case class TargetRegion[N: Integral](region: GridExtent[N]) extends ResampleGrid[N] {
   def apply(source: => GridExtent[N]): GridExtent[N] =
     region
+}
+
+
+object ResampleGrid {
+  /** Used when somebody is trying to reproject to same CRS, pick-out the grid */
+  private[vlm] def fromReprojectOptions(options: Reproject.Options): Option[ResampleGrid[Long]] ={
+    if (options.targetRasterExtent.isDefined) {
+      Some(TargetRegion(options.targetRasterExtent.get.toGridType[Long]))
+    } else if (options.parentGridExtent.isDefined) {
+      Some(TargetGrid(options.parentGridExtent.get))
+    } else if (options.targetCellSize.isDefined) {
+      ??? // TODO: convert from CellSize to Column count based on ... something
+    } else {
+      None
+    }
+  }
 }
